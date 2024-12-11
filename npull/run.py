@@ -38,7 +38,7 @@ class Runner:
         os.makedirs(self.base_exp_dir, exist_ok=True)
         
         print("Dataset "+str(self.conf['dataset']))
-        self.dataset_np = DatasetNP(filepath, name)
+        self.dataset_np = DatasetNP(filepath)
         self.dataname = name
         self.iter_step = 0
 
@@ -59,7 +59,7 @@ class Runner:
         self.optimizer = torch.optim.Adam(self.sdf_network.parameters(), lr=self.learning_rate)
 
         # Backup codes and configs for debug
-        self.file_backup()
+        #self.file_backup()
     def train(self):
         timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
         log_file = os.path.join(os.path.join(self.base_exp_dir), f'{timestamp}.log')
@@ -90,10 +90,10 @@ class Runner:
             
             self.iter_step += 1
             if self.iter_step % self.report_freq == 0:
-                print_log('iter:{:8>d} cd_l1 = {} lr={}'.format(self.iter_step, loss_sdf, self.optimizer.param_groups[0]['lr']), logger=logger)
+                print_log('iter:{:8>d} cd_l1 = {} lr={} loss={}'.format(self.iter_step, loss_sdf, self.optimizer.param_groups[0]['lr'],loss_sdf), logger=logger)
 
             if self.iter_step % self.val_freq == 0 and self.iter_step!=0: 
-                self.validate_mesh(resolution=256, threshold=args.mcubes_threshold, point_gt=point_gt, iter_step=self.iter_step, logger=logger)
+                self.validate_mesh(resolution=256, threshold=0.0, point_gt=point_gt, iter_step=self.iter_step, logger=logger)
 
             if self.iter_step % self.save_freq == 0 and self.iter_step!=0: 
                 self.save_checkpoint()
@@ -119,24 +119,38 @@ class Runner:
             g['lr'] = lr
     
     def extract_fields(self, bound_min, bound_max, resolution, query_func):
+        #print("a")
         N = 32
         X = torch.linspace(bound_min[0], bound_max[0], resolution).split(N)
         Y = torch.linspace(bound_min[1], bound_max[1], resolution).split(N)
         Z = torch.linspace(bound_min[2], bound_max[2], resolution).split(N)
-
+        #print("b")
         u = np.zeros([resolution, resolution, resolution], dtype=np.float32)
         with torch.no_grad():
             for xi, xs in enumerate(X):
                 for yi, ys in enumerate(Y):
                     for zi, zs in enumerate(Z):
+                        #print("c")
+                        xs=xs.to(self.device)
+                        ys=ys.to(self.device)
+                        zs=zs.to(self.device)
                         xx, yy, zz = torch.meshgrid(xs, ys, zs)
                         pts = torch.cat([xx.reshape(-1, 1), yy.reshape(-1, 1), zz.reshape(-1, 1)], dim=-1)
+                        pts=pts.to(self.device)
+                        
+                        #print("d")
+                        #print(pts.get_device())
                         val = query_func(pts).reshape(len(xs), len(ys), len(zs)).detach().cpu().numpy()
+                        
                         u[xi * N: xi * N + len(xs), yi * N: yi * N + len(ys), zi * N: zi * N + len(zs)] = val
+                        
         return u
 
     def extract_geometry(self, bound_min, bound_max, resolution, threshold, query_func):
         print('Creating mesh with threshold: {}'.format(threshold))
+        print(bound_min.get_device())
+        print(bound_max.get_device())
+        print(bound_min)
         u = self.extract_fields(bound_min, bound_max, resolution, query_func)
         vertices, triangles = mcubes.marching_cubes(u, threshold)
         b_max_np = bound_max.detach().cpu().numpy()
