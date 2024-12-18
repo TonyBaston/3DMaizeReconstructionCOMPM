@@ -76,6 +76,8 @@ class Runner:
                 
             samples.requires_grad = True
             gradients_sample = self.sdf_network.gradient(samples).squeeze() # 5000x3
+            #print("gradient:")
+            #print(gradients_sample)
             sdf_sample = self.sdf_network.sdf(samples)                      # 5000x1
             grad_norm = F.normalize(gradients_sample, dim=1)                # 5000x3
             sample_moved = samples - grad_norm * sdf_sample                 # 5000x3
