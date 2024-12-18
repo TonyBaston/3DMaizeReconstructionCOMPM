@@ -17,6 +17,7 @@ def search_nearest_point(point_batch, point_gt):
     return dis_idx
 
 def process_data(data_dir, dataname):
+    print(os.path.join(data_dir, dataname) + '.ply')
     if os.path.exists(os.path.join(data_dir, dataname) + '.ply'):
         pointcloud = trimesh.load(os.path.join(data_dir, dataname) + '.ply').vertices
         pointcloud = np.asarray(pointcloud)
