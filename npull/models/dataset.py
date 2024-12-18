@@ -16,13 +16,13 @@ def search_nearest_point(point_batch, point_gt):
 
     return dis_idx
 
-def process_data(file):
-    print(file)
-    if file.endswith('.ply'):
-        pointcloud = trimesh.load(file).vertices
+def process_data(data_dir, dataname):
+    print(os.path.join(data_dir, dataname) + '.ply')
+    if os.path.exists(os.path.join(data_dir, dataname) + '.ply'):
+        pointcloud = trimesh.load(os.path.join(data_dir, dataname) + '.ply').vertices
         pointcloud = np.asarray(pointcloud)
-    elif file.endswith('.xyz'):
-        pointcloud = np.load(file)
+    elif os.path.exists(os.path.join(data_dir, dataname) + '.xyz'):
+        pointcloud = np.load(os.path.join(data_dir, dataname)) + '.xyz'
     else:
         print('Only support .xyz or .ply data. Please make adjust your data.')
         exit()
@@ -67,32 +67,28 @@ def process_data(file):
     sample = np.asarray(sample)
     sample_near = np.asarray(sample_near)
 
-    np.savez(os.path.splitext(file)[0]+'.npz', sample = sample, point = pointcloud, sample_near = sample_near)
+    np.savez(os.path.join(data_dir, dataname)+'.npz', sample = sample, point = pointcloud, sample_near = sample_near)
 
 
 class DatasetNP:
-    def __init__(self, file):
+    def __init__(self, conf, dataname):
         super(DatasetNP, self).__init__()
         self.device = torch.device('cuda')
-        self.np_data_name = os.path.splitext(file)[0] + '.npz'
-        if os.path.exists(file):
+        self.conf = conf
+
+        self.data_dir = conf.get_string('data_dir')
+        self.np_data_name = dataname + '.npz'
+
+        if os.path.exists(os.path.join(self.data_dir, self.np_data_name)):
             print('Data existing. Loading data...')
         else:
             print('Data not found. Processing data...')
-            process_data(self.data_dir, os.path.splitext(file)[0])
-        load_data = self.load(file)
-        if load_data is dict:
-            self.point = np.asarray(load_data['sample_near']).reshape(-1,3)
-            self.sample = np.asarray(load_data['sample']).reshape(-1,3)
-            self.point_gt = np.asarray(load_data['point']).reshape(-1,3)
-        else:
-            #we test 25 sample points per point
-            np.repeat(load_data,24,axis=0)
-            print(load_data.shape)
-            self.point = load_data
-            
-            self.sample = load_data+np.random.randn(load_data.shape[0],3)*.5
-            self.point_gt = load_data
+            process_data(self.data_dir, dataname)
+        load_data = np.load(os.path.join(self.data_dir, self.np_data_name))
+        
+        self.point = np.asarray(load_data['sample_near']).reshape(-1,3)
+        self.sample = np.asarray(load_data['sample']).reshape(-1,3)
+        self.point_gt = np.asarray(load_data['point']).reshape(-1,3)
         self.sample_points_num = self.sample.shape[0]-1
 
         self.object_bbox_min = np.array([np.min(self.point[:,0]), np.min(self.point[:,1]), np.min(self.point[:,2])]) -0.05
@@ -102,6 +98,7 @@ class DatasetNP:
         self.point = torch.from_numpy(self.point).to(self.device).float()
         self.sample = torch.from_numpy(self.sample).to(self.device).float()
         self.point_gt = torch.from_numpy(self.point_gt).to(self.device).float()
+        
         print('NP Load data: End')
 
     def np_train_data(self, batch_size):
@@ -111,21 +108,3 @@ class DatasetNP:
         points = self.point[index]
         sample = self.sample[index]
         return points, sample, self.point_gt
-    def load(self,name):
-        try:
-            return np.load(name)
-        except:
-            data=list()
-            with open(name,'r') as f:
-                
-                for line in f:
-                    pt=np.zeros([3])
-                    for i,val in enumerate(line.split()):
-                        if val.endswith(","):
-                            val=val[:-1]
-                        if i==3:
-                            break
-                        pt[i]=val
-                    data.append(pt)
-            print(np.array(data))
-            return np.array(data)

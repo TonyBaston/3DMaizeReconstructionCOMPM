@@ -72,7 +72,6 @@ class NPullNetwork(nn.Module):
             lin = getattr(self, "lin" + str(l))
             if l in self.skip_in:
                 x = torch.cat([x, inputs], 1) / np.sqrt(2)
-
             x = lin(x)
             if l < self.num_layers - 2:
                 x = self.activation(x)
