@@ -176,7 +176,9 @@ class Runner:
         torch.save(checkpoint, os.path.join(self.base_exp_dir, 'checkpoints', 'ckpt_{:0>6d}.pth'.format(self.iter_step)))
 class Args:
     pass
-def train(dir,dataname,conf='npull/confs/npull.conf'):
+def train(dir,dataname='',conf='npull/confs/npull.conf'):
+    if dataname=='':
+        dataname=dir
     torch.cuda.set_device(0)
     args={'mcubes_threshold':0,'gpu':1,'dir':dir,'dataname':dataname}
     args=Args()
