@@ -107,7 +107,12 @@ class Runner:
 
         mesh.export(os.path.join(self.base_exp_dir, 'outputs', '{:0>8d}_{}.ply'.format(self.iter_step,str(threshold))))
 
+    def get_mesh(self, resolution=64, threshold=0.0, point_gt=None, iter_step=0, logger=None):
 
+        bound_min = torch.tensor(self.dataset_np.object_bbox_min, dtype=torch.float32)
+        bound_max = torch.tensor(self.dataset_np.object_bbox_max, dtype=torch.float32)
+        os.makedirs(os.path.join(self.base_exp_dir, 'outputs'), exist_ok=True)
+        return self.extract_geometry(bound_min, bound_max, resolution=resolution, threshold=threshold, query_func=lambda pts: -self.sdf_network.sdf(pts))
     def update_learning_rate_np(self, iter_step):
         warn_up = self.warm_up_end
         max_iter = self.maxiter
@@ -176,7 +181,7 @@ class Runner:
         torch.save(checkpoint, os.path.join(self.base_exp_dir, 'checkpoints', 'ckpt_{:0>6d}.pth'.format(self.iter_step)))
 class Args:
     pass
-def train(dir,dataname='',conf='npull/confs/npull.conf'):
+def get_model(dir,dataname='',conf='npull/confs/npull.conf'):
     if dataname=='':
         dataname=dir
     torch.cuda.set_device(0)
@@ -186,8 +191,9 @@ def train(dir,dataname='',conf='npull/confs/npull.conf'):
     args.gpu=0
     args.dir=dir
     args.dataname=dataname
-    runner = Runner(args,conf,'train')
-    runner.train()
+    return Runner(args,conf,'train')
+def train(dir,dataname='',conf='npull/confs/npull.conf'):
+    get_model(dir,dataname,conf).train()
 if __name__ == '__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     parser = argparse.ArgumentParser()
